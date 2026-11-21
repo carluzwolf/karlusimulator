@@ -305,27 +305,40 @@ function gesture(res){
  return ''}
 function onHands(res){var g=gesture(res),n=now();if(!g||n-lastG<5000||P.phase!='run')return;lastG=n;
  if(g=='middle')fire('Bravo',true);else if(g=='heart')fire('Apaixonado',true);else if(g=='thumb')fire('Joinha',true)}
-function camLoop(){if(!camOn)return;if(vd.readyState>=2){hands.send({image:vd}).then(function(){setTimeout(camLoop,120)},function(){setTimeout(camLoop,500)})}else setTimeout(camLoop,200)}
+function camLoop(){if(!camOn)return;
+ if(vd.readyState>=2&&vd.videoWidth){hands.send({image:vd}).then(function(){setTimeout(camLoop,100)},function(){setTimeout(camLoop,400)})}else setTimeout(camLoop,200)}
+var HB=['https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/','https://unpkg.com/@mediapipe/hands@0.4.1675469240/'];
+function camStop(){camOn=false;if(camS){camS.getTracks().forEach(function(t){t.stop()});camS=null}}
 function camStart(cb){
- var md=navigator.mediaDevices;if(!md||!md.getUserMedia){cb(false);return}
- md.getUserMedia({video:{facingMode:'user',width:320,height:240}}).then(function(s){camS=s;vd.srcObject=s;vd.play();
-  ld('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js',function(){
-   try{hands=new Hands({locateFile:function(f){return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/'+f}});
-   hands.setOptions({maxNumHands:2,modelComplexity:0,minDetectionConfidence:.6,minTrackingConfidence:.5});hands.onResults(onHands);camOn=true;camLoop();cb(true)}catch(e){cb(false)}},function(){cb(false)})
- }).catch(function(){cb(false)})}
+ var md=navigator.mediaDevices;if(!md||!md.getUserMedia){cb(false,'Este navegador não libera a câmera (precisa abrir por https).');return}
+ md.getUserMedia({video:{facingMode:'user'},audio:false}).then(function(s){
+  camS=s;vd.setAttribute('playsinline','');vd.setAttribute('webkit-playsinline','');vd.muted=true;vd.srcObject=s;
+  var pl=vd.play();if(pl&&pl.catch)pl.catch(function(){});
+  say('Câmera ok. Baixando reconhecimento de mão...');loadHands(0,cb)
+ },function(e){cb(false,'Permissão da câmera negada ou câmera ocupada ('+(e&&e.name||'erro')+').')})}
+function loadHands(i,cb){
+ if(window.Hands){startHands(HB[Math.max(0,i-1)],cb);return}
+ if(i>=HB.length){cb(false,'Não consegui baixar o reconhecimento de mão (internet ou bloqueio).');return}
+ ld(HB[i]+'hands.js',function(){startHands(HB[i],cb)},function(){loadHands(i+1,cb)})}
+function startHands(base,cb){
+ say('Iniciando modelo de mão (pode demorar uns segundos)...');
+ try{hands=new Hands({locateFile:function(f){return base+f}});
+  hands.setOptions({maxNumHands:2,modelComplexity:0,minDetectionConfidence:.6,minTrackingConfidence:.5});hands.onResults(onHands);
+  hands.initialize().then(function(){camOn=true;camLoop();cb(true)},function(e){cb(false,'Falha ao iniciar o modelo: '+(e&&e.message||e))})
+ }catch(e){cb(false,'Erro no reconhecimento: '+(e&&e.message||e))}}
 var tc=document.getElementById('tCam');
-tc.onclick=function(){if(camOn){camOn=false;if(camS)camS.getTracks().forEach(function(t){t.stop()});tc.className='sw';say('Câmera desligada');return}
- say('Carregando câmera e reconhecimento...');camStart(function(ok){tc.className='sw'+(ok?' on':'');say(ok?'Câmera ligada: dedo do meio = bravo, coração = amor, joinha = feliz.':'Câmera indisponível: negada, sem internet ou aparelho antigo demais.')})};
-
+tc.onclick=function(){if(camOn){camStop();tc.className='sw';say('Câmera desligada');return}
+ say('Pedindo permissão da câmera...');
+ camStart(function(ok,msg){if(!ok)camStop();tc.className='sw'+(ok?' on':'');say(ok?'Câmera ligada: dedo do meio = bravo, coração = amor, joinha = feliz.':msg)})};
 /* ---------- giroscopio / acelerometro ---------- */
 var motOn=false,motT=0;
-function onOri(e){var o=window.orientation||0,g;
- if(o==90||o==-90){if(e.beta==null)return;g=cl(e.beta,-70,70)*(o==90?-1:1)}else{if(e.gamma==null)return;g=cl(e.gamma,-70,70)}
- tgT=g}
-function onMot(e){var a=e.accelerationIncludingGravity;if(!a||a.x==null)return;
- var d=Math.abs(Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z)-9.81);if(d>8)DZ=Math.min(1,DZ+d/150)}
+var IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1),angT=0;
+function onMot(e){var a=e.accelerationIncludingGravity;if(!a||a.x==null||a.y==null)return;
+ var d=Math.abs(Math.sqrt(a.x*a.x+(a.y*a.y)+(a.z||0)*(a.z||0))-9.81);if(d>8)DZ=Math.min(1,DZ+d/150);
+ var sg=IOS?-1:1,ax=a.x*sg,ay=a.y*sg;
+ if(ax*ax+ay*ay>9)angT=Math.atan2(ax,ay)*57.2958-(window.orientation||0)}
 function motTick(){
- TR+=(-tgT*.7-TR)*.12;TG+=(tgT/70*9-TG)*.1;DZ*=.985;
+ var df=angT-TR;df=((df+540)%360+360)%360-180;TR+=df*.15;if(TR>180)TR-=360;if(TR<-180)TR+=360;TG=0;DZ*=.985;
  if(DZ>.45&&P.phase=='run'&&(!act||act.n.indexOf('Tontura')!=0))fire('Tontura',true)}
 function motReq(cb){
  var D=window.DeviceMotionEvent,O=window.DeviceOrientationEvent;
@@ -334,15 +347,15 @@ function motReq(cb){
  else cb(!!(D||O))}
 var tmo=document.getElementById('tMot');
 tmo.onclick=function(){
- if(motOn){motOn=false;window.removeEventListener('deviceorientation',onOri);window.removeEventListener('devicemotion',onMot);clearInterval(motT);tgT=0;DZ=0;TR=0;TG=0;tmo.className='sw';say('Giroscópio desligado');return}
+ if(motOn){motOn=false;window.removeEventListener('devicemotion',onMot);clearInterval(motT);tgT=0;DZ=0;TR=0;TG=0;tmo.className='sw';say('Giroscópio desligado');return}
  motReq(function(ok){if(!ok){say('Sensores negados ou indisponíveis neste aparelho.');return}
-  motOn=true;window.addEventListener('deviceorientation',onOri);window.addEventListener('devicemotion',onMot);motT=setInterval(motTick,33);tmo.className='sw on';say('Giroscópio ligado: incline o celular e balance para ele ficar tonto.')})};
+  motOn=true;window.addEventListener('devicemotion',onMot);motT=setInterval(motTick,33);tmo.className='sw on';say('Giroscópio ligado: gire o celular em qualquer sentido (até de cabeça pra baixo) que o rosto fica em pé. Balance para ele ficar tonto.')})};
 setFace(0,true);
 x.fillStyle='#000';x.fillRect(0,0,480,480);
 loop();
 power(true);
 })();
 </script>
-<video id="vd" playsinline muted style="display:none"></video>
+<video id="vd" playsinline muted style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
 </body>
 </html>
