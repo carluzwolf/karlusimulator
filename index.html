@@ -50,19 +50,22 @@ h3{font-size:12px;letter-spacing:1px;color:#999;margin:20px 0 8px;text-transform
 </div>
 <div id="sh"></div>
 <div id="pn">
- <h2>KARLU · CONFIGURAÇÕES</h2><div style="font-size:11px;color:#666;margin:-8px 0 8px">versão 4 (se não aparecer, limpe o cache)</div>
+ <h2>KARLU · CONFIGURAÇÕES</h2><div style="font-size:11px;color:#666;margin:-8px 0 8px">versão 5 (se não aparecer, limpe o cache)</div>
  <div class="row"><span>Travar rosto atual</span><button class="sw" id="tLock"></button></div>
  <div class="row"><span>Reações automáticas</span><button class="sw on" id="tAuto"></button></div>
  <div class="row"><span>Troca de rosto automática</span><button class="sw on" id="tMorph"></button></div>
  <div class="row"><span>Microfone (reage ao som)</span><button class="sw" id="tMic"></button></div>
  <div class="row"><span>Câmera (gestos)</span><button class="sw" id="tCam"></button></div>
+ <div class="row"><span>Comandos de voz (falar com ele)</span><button class="sw" id="tVoz"></button></div>
  <div class="row"><span>Giroscópio (inclinar e balançar)</span><button class="sw" id="tMot"></button></div>
  <div id="dbg" style="font-size:12px;color:#ff1493;padding:2px 0"></div>
+ <div id="heard" style="font-size:12px;color:#7fd;padding:2px 0"></div>
  <div id="st" style="font-size:12px;color:#888;padding:6px 0"></div>
  <h3>Reações (toque para rodar)</h3><div class="g" id="gR"></div>
  <h3>Olhos / Rostos (76)</h3><div class="g" id="gF"></div>
  <button class="bt" id="bBoot">Reiniciar animação de abertura</button>
 </div>
+<video id="vd" playsinline muted style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
 <script>
 (function(){
 var F=[[255,66,196,250,220,184,255,66,196,250,220,184],[46,92,255,170,235,255,46,92,255,170,235,255],[60,255,120,255,250,150,60,255,120,255,250,150],[160,80,255,255,170,230,160,80,255,255,170,230],[255,140,40,255,235,120,255,140,40,255,235,120],[255,45,60,255,225,225,255,45,60,255,225,225],[30,230,240,20,40,150,30,230,240,20,40,150],[255,226,72,255,120,40,255,226,72,255,120,40],[235,240,255,70,110,255,235,240,255,70,110,255],[190,255,60,30,140,70,190,255,60,30,140,70],[40,220,170,255,150,200,40,220,170,255,150,200],[220,60,255,120,240,255,220,60,255,120,240,255],[255,110,100,255,225,190,255,110,100,255,225,190],[140,200,255,150,80,255,140,200,255,150,80,255],[255,190,40,230,50,50,255,190,40,230,50,50],[30,170,90,190,255,215,30,170,90,190,255,215],
@@ -114,6 +117,8 @@ var R=[
 {n:'Com calor',d:3600,tint:[255,70,40,.4],cT:.1,deco:'sweat'},
 {n:'Congelando',d:3400,tint:[150,230,255,.5],m:'trem'},
 {n:'Modo festa',d:4000,rb:1,m:'bounce',deco:'spark'},
+{n:'Oi!',d:2600,arc:-1,sc:1.08,m:'bounce',deco:'spark'},
+{n:'Tchau',d:2600,arc:-1,m:'sway'},
 {n:'Joinha 👍',d:3000,arc:-1,m:'nod',deco:'spark',sc:1.05},
 {n:'Cambalhota',d:1700,m:'spin'},
 {n:'Escaneando',d:3200,gm:'scan',deco:'scan'}
@@ -277,12 +282,17 @@ var st=document.getElementById('st');
 function say(t){st.textContent=t}
 function fire(nm,force){if(P.phase!='run')return false;if(act&&!force)return false;for(var i=0;i<R.length;i++)if(R[i].n.indexOf(nm)==0){startAct(i);return true}return false}
 var AC,an,buf,micOn=false,micS,mbase=6,lastL=0,lastT=0;
+var talkC=0;
 function micLoop(){
  if(!micOn)return;setTimeout(micLoop,60);an.getByteTimeDomainData(buf);
  var m=0,i,d;for(i=0;i<buf.length;i++){d=Math.abs(buf[i]-128);if(d>m)m=d}
  var n=now();mbase+=(Math.min(m,30)-mbase)*.02;
- if(m>78){if(n-lastL>150&&n-lastL<850){fire('Cambalhota',true);lastL=0}else{lastL=n;fire('Susto',true)}return}
- if(m>mbase+14&&n-lastT>6000){if(fire('Curioso'))lastT=n}}
+ if(m>108&&m-mbase>60){talkC=0;
+  if(n-lastL>180&&n-lastL<900){lastL=0;fire('Cambalhota',true)}
+  else{lastL=n;setTimeout(function(){if(lastL&&now()-lastL>=700){lastL=0;fire('Susto',true)}},750)}return}
+ if(vOn)return;
+ if(m>mbase+26)talkC++;else talkC=0;
+ if(talkC>=6&&n-lastT>15000){talkC=0;if(fire('Curioso'))lastT=n}}
 function micStart(cb){
  var md=navigator.mediaDevices;if(!md||!md.getUserMedia){cb(false);return}
  md.getUserMedia({audio:true}).then(function(s){micS=s;AC=new(window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume();
@@ -311,12 +321,16 @@ function camLoop(){if(!camOn)return;
 var HB=['https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/','https://unpkg.com/@mediapipe/hands@0.4.1675469240/'];
 function camStop(){camOn=false;if(camS){camS.getTracks().forEach(function(t){t.stop()});camS=null}}
 function camStart(cb){
- var md=navigator.mediaDevices;if(!md||!md.getUserMedia){cb(false,'Este navegador não libera a câmera (precisa abrir por https).');return}
- md.getUserMedia({video:{facingMode:'user'},audio:false}).then(function(s){
-  camS=s;vd.setAttribute('playsinline','');vd.setAttribute('webkit-playsinline','');vd.muted=true;vd.srcObject=s;
-  var pl=vd.play();if(pl&&pl.catch)pl.catch(function(){});
-  say('Câmera ok. Baixando reconhecimento de mão...');loadHands(0,cb)
- },function(e){cb(false,'Permissão da câmera negada ou câmera ocupada ('+(e&&e.name||'erro')+').')})}
+ var md=navigator.mediaDevices,done=false,vd=document.getElementById('vd');
+ if(!md||!md.getUserMedia){cb(false,'Este navegador não libera a câmera (precisa abrir por https).');return}
+ var wd=setTimeout(function(){if(!done){done=true;cb(false,'A câmera não respondeu. Feche outros apps/abas que usam a câmera e tente de novo.')}},30000);
+ function ok(st){if(done){st.getTracks().forEach(function(t){t.stop()});return}done=true;clearTimeout(wd);
+  try{camS=st;vd.setAttribute('playsinline','');vd.setAttribute('webkit-playsinline','');vd.muted=true;vd.srcObject=st;
+   var pl=vd.play();if(pl&&pl.catch)pl.catch(function(){});
+   say('Câmera ok. Baixando reconhecimento de mão...');loadHands(0,cb)}catch(e){cb(false,'Erro ao abrir o vídeo: '+(e&&e.message||e))}}
+ function ko(e){if(done)return;done=true;clearTimeout(wd);cb(false,'Permissão da câmera negada ou câmera ocupada ('+(e&&e.name||'erro')+').')}
+ md.getUserMedia({video:{facingMode:'user'},audio:false}).then(ok,function(e){
+  if(e&&(e.name=='OverconstrainedError'||e.name=='ConstraintNotSatisfiedError'))md.getUserMedia({video:true}).then(ok,ko);else ko(e)})}
 function loadHands(i,cb){
  if(window.Hands){startHands(HB[Math.max(0,i-1)],cb);return}
  if(i>=HB.length){cb(false,'Não consegui baixar o reconhecimento de mão (internet ou bloqueio).');return}
@@ -325,7 +339,8 @@ function startHands(base,cb){
  say('Iniciando modelo de mão (pode demorar uns segundos)...');
  try{hands=new Hands({locateFile:function(f){return base+f}});
   hands.setOptions({maxNumHands:2,modelComplexity:0,minDetectionConfidence:.6,minTrackingConfidence:.5});hands.onResults(onHands);
-  hands.initialize().then(function(){camOn=true;camLoop();cb(true)},function(e){cb(false,'Falha ao iniciar o modelo: '+(e&&e.message||e))})
+  var iw=setTimeout(function(){cb(false,'O modelo demorou demais para carregar (internet lenta ou aparelho sem suporte).');iw=null},45000);
+  hands.initialize().then(function(){if(!iw)return;clearTimeout(iw);camOn=true;camLoop();cb(true)},function(e){if(!iw)return;clearTimeout(iw);cb(false,'Falha ao iniciar o modelo: '+(e&&e.message||e))})
  }catch(e){cb(false,'Erro no reconhecimento: '+(e&&e.message||e))}}
 var tc=document.getElementById('tCam');
 tc.onclick=function(){if(camOn){camStop();tc.className='sw';say('Câmera desligada');return}
@@ -353,12 +368,31 @@ tmo.onclick=function(){
  if(motOn){motOn=false;window.removeEventListener('devicemotion',onMot);clearInterval(motT);tgT=0;DZ=0;TR=0;TG=0;angT=0;document.getElementById('dbg').textContent='';tmo.className='sw';say('Giroscópio desligado');return}
  motReq(function(ok){if(!ok){say('Sensores negados ou indisponíveis neste aparelho.');return}
   motOn=true;sgc=null;evc=0;window.addEventListener('devicemotion',onMot);motT=setInterval(motTick,33);tmo.className='sw on';say('Giroscópio ligado: gire o celular em qualquer sentido (até de cabeça pra baixo) que o rosto fica em pé. Balance para ele ficar tonto.')})};
-setFace(0,true);
-x.fillStyle='#000';x.fillRect(0,0,480,480);
-loop();
-power(true);
-})();
-</script>
-<video id="vd" playsinline muted style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
-</body>
-</html>
+var CM=[["r", "Oi!", ["oi", "ola", "e ai", "eae", "opa", "fala", "salve", "bom dia", "boa tarde", "tudo bem", "tudo bom", "como vai", "como voce esta", "oi karlu", "ola karlu", "ei karlu", "e ai karlu", "hey", "hello", "hi", "alo", "beleza", "fala ai", "bem vindo", "boas vindas", "prazer", "karlu"]], ["r", "Tchau", ["tchau", "ate logo", "ate mais", "ate amanha", "adeus", "fui", "falou", "xau", "flw", "vou embora", "bye", "ate a proxima", "tenho que ir"]], ["r", "Dormindo", ["dorme", "vai 
+dormir", "boa noite", "hora de dormir", "soneca", "dorme karlu", "bons sonhos", "zzz", "vai deitar", "descansa"]], ["r", "Bocejo", ["bocejo", "boceja", "com sono", "sono", "cansado", "estou cansado", "que sono", "preguica", "entediado", "que tedio", "tedio"]], ["r", "Feliz", ["feliz", "fica feliz", "alegria", "que bom", "sorria", "sorri", "obrigado", "obrigada", "valeu", "gostei", "ta lindo", "que lindo", "voce e lindo", "bonitinho", "fofo", "que fofo", "voce e fofo", "bom garoto", "bom 
+menino", "animado", "alegre", "contente", "sorriso"]], ["r", "Risada", ["ri", "risada", "hahaha", "haha", "kkk", "rindo", "engracado", "piada", "conta uma piada", "muito engracado", "que engracado", "gargalhada", "da risada", "ri um pouco"]], ["r", "Triste", ["triste", "fica triste", "estou triste", "que pena", "sinto muito", "coitado", "desanimado", "tristeza", "deprimido", "desanima"]], ["r", "Chorando", ["chora", "chorar", "vai chorar", "chorando", "lagrimas", "choro", "fica chorando"]], 
+["r", "Bravo", ["bravo", "raiva", "fica bravo", "com raiva", "irritado", "nervoso", "grr", "odio", "estressado", "furioso", "brabo", "fica brabo", "dedo do meio", "vai se", "cara feia", "cara de bravo"]], ["r", "Surpresa", ["surpresa", "uau", "nossa", "caramba", "uou", "incrivel", "que isso", "serio", "jura", "nao acredito", "wow", "meu deus", "misericordia", "olha so"]], ["r", "Susto", ["susto", "buu", "boo", "cuidado", "olha atras", "assusta", "medo", "fantasma", "aaah", "socorro", "terror", 
+"assustado", "toma um susto"]], ["r", "Apaixonado", ["te amo", "eu te amo", "amor", "apaixonado", "coracao", "fica apaixonado", "amo voce", "beijo", "beijinho", "namorar", "paixao", "fofura", "love", "meu amor", "te adoro", "adoro voce", "beijos", "namorado", "crush"]], ["r", "Olhos de estrela", ["estrela", "brilha", "olhos de estrela", "deslumbrado", "sonhando", "magico", "magica", "lindo demais", "que lindo isso", "maravilhoso", "encantado", "fascinado"]], ["r", "Olhos de cifrão", 
+["dinheiro", "rico", "cifrao", "grana", "milionario", "pix", "bitcoin", "lucro", "vender", "ficar rico", "salario", "pagamento", "bilionario"]], ["r", "Hipnose", ["hipnose", "hipnotiza", "hipnotizado", "espiral", "hipnotizar", "me hipnotiza"]], ["r", "Piscadela", ["pisca", "piscadinha", "piscadela", "pisca pra mim", "da uma piscada", "wink", "pisca o olho", "piscar"]], ["r", "Não", ["nao", "negativo", "de jeito nenhum", "nem pensar", "jamais", "discordo", "errado", "nunca", "nao quero", "de 
+forma alguma", "nada disso"]], ["r", "Sim", ["sim", "claro", "concordo", "com certeza", "ok", "certo", "isso mesmo", "positivo", "pode ser", "aham", "uhum", "exato", "fechou", "combinado", "certeza", "tudo certo", "entendi", "entendido"]], ["r", "Pensando", ["pensa", "pensando", "hmm", "humm", "deixa eu pensar", "sera", "duvida", "pensativo", "calma ai", "analisa", "reflete", "vamos ver", "vou pensar", "pensa ai"]], ["r", "Curioso", ["curioso", "curiosidade", "o que e isso", "que que e isso", 
+"interessante", "me conta", "conta mais", "olha isso", "ei olha", "quem e", "explica", "e agora", "o que foi"]], ["r", "Desconfiado", ["desconfiado", "desconfia", "duvido", "suspeito", "sera mesmo", "hum sei", "mentira", "mentiroso", "nao confio", "tem algo errado"]], ["r", "Vesgo", ["vesgo", "fica vesgo", "olha pro nariz", "olhos cruzados", "cruza os olhos", "estrabismo", "olho cruzado"]], ["r", "Tontura", ["tonto", "tontura", "fica tonto", "to tonto", "zonzo", "tudo girando", "bebado", 
+"enjoado", "nauseado", "rodando", "cabeca rodando"]], ["r", "Cambalhota", ["gira", "girar", "gira ai", "da uma volta", "rodar", "roda", "cambalhota", "faz uma cambalhota", "da um giro", "giro", "pirueta", "da uma cambalhota", "rodopia", "rodopio", "capota", "gira gira", "da um giro completo", "360", "faz uma pirueta", "volta completa"]], ["r", "Ideia!", ["ideia", "tive uma ideia", "lampada", "aha", "eureka", "descobri", "ja sei", "pensei", "tenho uma ideia", "genial", "brilhante", "acendeu"]], 
+["r", "Com calor", ["calor", "que calor", "quente", "derretendo", "pegando fogo", "suando", "verao", "sol forte", "fogo", "esta quente", "ta quente", "abafado"]], ["r", "Congelando", ["frio", "que frio", "congelando", "gelado", "gelo", "brr", "inverno", "neve", "congelei", "tremendo", "ta frio", "esta frio", "geladeira"]], ["r", "Modo festa", ["festa", "vamos festejar", "balada", "danca", "dancar", "festejar", "rave", "parabens", "feliz aniversario", "aniversario", "comemora", "comemorar", 
+"hora da festa", "modo festa", "colorido", "arco iris", "luzes", "musica", "vamos dancar", "show de luzes", "discoteca"]], ["r", "Escaneando", ["escaneia", "escanear", "scan", "escaner", "procurar", "procura", "analisar", "verifica", "radar", "detecta", "inspeciona", "varre", "varredura", "modo scanner"]], ["r", "Joinha", ["joinha", "legal", "massa", "show", "top", "bacana", "da hora", "maneiro", "boa", "mandou bem", "excelente", "perfeito", "otimo", "muito bom", "sensacional", "aprovado", 
+"curti", "curtir", "muito bem", "bom trabalho", "tamo junto", "dahora", "irado", "topzera"]], ["look", [-9, 0], ["olha pra esquerda", "olha para a esquerda", "olha esquerda", "esquerda", "olha pro lado esquerdo"]], ["look", [9, 0], ["olha pra direita", "olha para a direita", "olha direita", "direita", "olha pro lado direito"]], ["look", [0, -9], ["olha pra cima", "olha para cima", "cima", "olha pro teto", "olha la em cima"]], ["look", [0, 9], ["olha pra baixo", "olha para baixo", "baixo", "olha 
+pro chao", "olha la embaixo"]], ["look", [0, 0], ["olha pra mim", "me olha", "olha aqui", "olha pra frente", "olha pra ca", "me encara", "olha nos meus olhos"]], ["lock", 1, ["trava", "travar", "trava o rosto", "fixa o rosto", "fixa", "nao muda mais", "fica assim", "trava ai", "segura assim", "mantem assim", "mantem"]], ["lock", 0, ["destrava", "destravar", "solta", "pode mudar", "volta ao normal", "libera", "destrava o rosto", "pode trocar", "volta a mudar"]], ["face", 0, ["troca de rosto", 
+"outro rosto", "muda o rosto", "mudar rosto", "novo rosto", "troca o olho", "troca os olhos", "muda o olho", "outro olho", "outros olhos", "rosto aleatorio", "olho aleatorio", "transforma", "transformar", "me mostra outro", "proximo rosto", "proximo olho", "muda de olho", "troca de olho", "surpreende com outro olho"]], ["boot", 0, ["reinicia", "reiniciar", "reinicie", "liga de novo", "recomeca", "abertura", "mostra a logo", "mostra a abertura", "do comeco", "do comeco", "reset"]]];
+var COL=[[["vermelho", "vermelha"], [255, 30, 40]], [["azul"], [40, 90, 255]], [["verde"], [50, 230, 90]], [["rosa"], [255, 66, 196]], [["roxo", "roxa"], [160, 60, 255]], [["laranja"], [255, 140, 40]], [["amarelo", "amarela"], [255, 226, 72]], [["branco", "branca"], [245, 245, 255]], [["ciano"], [30, 230, 240]], [["dourado", "dourada", "ouro"], [255, 190, 40]], [["lilas"], [195, 165, 255]], [["turquesa"], [40, 220, 170]], [["marrom"], [150, 85, 35]], [["cinza"], [160, 165, 175]], [["magenta"], [230, 40, 200]], [["lima"], [190, 255, 60]], [["vinho"], [140, 20, 60]], [["azul claro", "celeste"], [130, 200, 255]], [["verde agua"], [110, 255, 190]]];
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=null,vOn=false,hd=document.getElementById('heard');
+function norm(t){t=t.toLowerCase();if(t.normalize)t=t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');return ' '+t.replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ')+' '}
+function setLock(v){S.lock=v;document.getElementById('tLock').className='sw'+(v?' on':'')}
+function setColor(c){var i,p=(c[0]*.3+c[1]*.6+c[2]*.1)>140?[25,20,70]:[255,255,255];
+ for(i=0;i<3;i++){cur.t[i]=c[i];cur.t[6+i]=c[i];cur.t[3+i]=p[i];cur.t[9+i]=p[i]}cur.tgb=null;flower=false;setLock(true)}
+function hsl(h){h=h%360;var f=function(n){var k=(n+h/30)%12;return Math.round(255*(.5-.5*Math.min(Math.min(k-3,9-k),1)))};return [f(0),f(8),f(4)]}
+function pickFace(i){smoke=1;smokeT=now();setFace(i,false)}
+function handle(t){
+ if(P.phase!='run')return false;var n=norm(t),i,j,m;
+ m=n.match(/(rosto|olho|olhos|face|numero) (\d+)/);
+ if(m){var k=parseInt(m[2],10);if(k>=1&&k<=N){pickFace(k-1);setLock(true);return true}}
+ if(/ (cor|muda de cor|mude de cor|troca de cor) /.test(n)&&/ aleatori/.test(n)){setColor(hsl(Math.random()*360));return true}
+ var tr=/ (olho|olhos|c
