@@ -50,13 +50,14 @@ h3{font-size:12px;letter-spacing:1px;color:#999;margin:20px 0 8px;text-transform
 </div>
 <div id="sh"></div>
 <div id="pn">
- <h2>KARLU · CONFIGURAÇÕES</h2>
+ <h2>KARLU · CONFIGURAÇÕES</h2><div style="font-size:11px;color:#666;margin:-8px 0 8px">versão 4 (se não aparecer, limpe o cache)</div>
  <div class="row"><span>Travar rosto atual</span><button class="sw" id="tLock"></button></div>
  <div class="row"><span>Reações automáticas</span><button class="sw on" id="tAuto"></button></div>
  <div class="row"><span>Troca de rosto automática</span><button class="sw on" id="tMorph"></button></div>
  <div class="row"><span>Microfone (reage ao som)</span><button class="sw" id="tMic"></button></div>
  <div class="row"><span>Câmera (gestos)</span><button class="sw" id="tCam"></button></div>
  <div class="row"><span>Giroscópio (inclinar e balançar)</span><button class="sw" id="tMot"></button></div>
+ <div id="dbg" style="font-size:12px;color:#ff1493;padding:2px 0"></div>
  <div id="st" style="font-size:12px;color:#888;padding:6px 0"></div>
  <h3>Reações (toque para rodar)</h3><div class="g" id="gR"></div>
  <h3>Olhos / Rostos (76)</h3><div class="g" id="gF"></div>
@@ -332,13 +333,15 @@ tc.onclick=function(){if(camOn){camStop();tc.className='sw';say('Câmera desliga
  camStart(function(ok,msg){if(!ok)camStop();tc.className='sw'+(ok?' on':'');say(ok?'Câmera ligada: dedo do meio = bravo, coração = amor, joinha = feliz.':msg)})};
 /* ---------- giroscopio / acelerometro ---------- */
 var motOn=false,motT=0;
-var IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1),angT=0;
+var IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1),angT=0,sgc=null,evc=0,dbgN=0;
 function onMot(e){var a=e.accelerationIncludingGravity;if(!a||a.x==null||a.y==null)return;
  var d=Math.abs(Math.sqrt(a.x*a.x+(a.y*a.y)+(a.z||0)*(a.z||0))-9.81);if(d>8)DZ=Math.min(1,DZ+d/150);
- var sg=IOS?-1:1,ax=a.x*sg,ay=a.y*sg;
+ evc++;if(sgc===null&&Math.abs(a.y)>4&&Math.abs(a.y)>Math.abs(a.x))sgc=a.y>0?1:-1;
+ var sg=sgc!==null?sgc:(IOS?-1:1),ax=a.x*sg,ay=a.y*sg;
  if(ax*ax+ay*ay>9)angT=Math.atan2(ax,ay)*57.2958-(window.orientation||0)}
 function motTick(){
  var df=angT-TR;df=((df+540)%360+360)%360-180;TR+=df*.15;if(TR>180)TR-=360;if(TR<-180)TR+=360;TG=0;DZ*=.985;
+ if(++dbgN%6==0)document.getElementById('dbg').textContent=evc?('sensor ok · ângulo '+Math.round(TR)+'°'):'sem sinal do sensor ainda...';
  if(DZ>.45&&P.phase=='run'&&(!act||act.n.indexOf('Tontura')!=0))fire('Tontura',true)}
 function motReq(cb){
  var D=window.DeviceMotionEvent,O=window.DeviceOrientationEvent;
@@ -347,9 +350,9 @@ function motReq(cb){
  else cb(!!(D||O))}
 var tmo=document.getElementById('tMot');
 tmo.onclick=function(){
- if(motOn){motOn=false;window.removeEventListener('devicemotion',onMot);clearInterval(motT);tgT=0;DZ=0;TR=0;TG=0;tmo.className='sw';say('Giroscópio desligado');return}
+ if(motOn){motOn=false;window.removeEventListener('devicemotion',onMot);clearInterval(motT);tgT=0;DZ=0;TR=0;TG=0;angT=0;document.getElementById('dbg').textContent='';tmo.className='sw';say('Giroscópio desligado');return}
  motReq(function(ok){if(!ok){say('Sensores negados ou indisponíveis neste aparelho.');return}
-  motOn=true;window.addEventListener('devicemotion',onMot);motT=setInterval(motTick,33);tmo.className='sw on';say('Giroscópio ligado: gire o celular em qualquer sentido (até de cabeça pra baixo) que o rosto fica em pé. Balance para ele ficar tonto.')})};
+  motOn=true;sgc=null;evc=0;window.addEventListener('devicemotion',onMot);motT=setInterval(motTick,33);tmo.className='sw on';say('Giroscópio ligado: gire o celular em qualquer sentido (até de cabeça pra baixo) que o rosto fica em pé. Balance para ele ficar tonto.')})};
 setFace(0,true);
 x.fillStyle='#000';x.fillRect(0,0,480,480);
 loop();
