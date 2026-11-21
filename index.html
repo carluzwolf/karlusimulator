@@ -395,4 +395,34 @@ function handle(t){
  m=n.match(/(rosto|olho|olhos|face|numero) (\d+)/);
  if(m){var k=parseInt(m[2],10);if(k>=1&&k<=N){pickFace(k-1);setLock(true);return true}}
  if(/ (cor|muda de cor|mude de cor|troca de cor) /.test(n)&&/ aleatori/.test(n)){setColor(hsl(Math.random()*360));return true}
- var tr=/ (olho|olhos|c
+ var tr=/ (olho|olhos|cor|muda|mude|troca|fica|deixa|pinta|poe|coloca|ponha) /.test(n);
+ if(tr){for(i=0;i<COL.length;i++)for(j=0;j<COL[i][0].length;j++)if(n.indexOf(' '+COL[i][0][j]+' ')>=0){setColor(COL[i][1]);return true}}
+ var best=null,bl=0;
+ for(i=0;i<CM.length;i++)for(j=0;j<CM[i][2].length;j++){var p=CM[i][2][j];if(p.length>bl&&n.indexOf(' '+p+' ')>=0){best=CM[i];bl=p.length}}
+ if(!best)return false;
+ var ty=best[0],ar=best[1];
+ if(ty=='r')fire(ar,true);
+ else if(ty=='look'){tgx=ar[0];tgy=ar[1];gAt=now()+4000}
+ else if(ty=='lock')setLock(!!ar);
+ else if(ty=='face'){var nf;do{nf=ri(N)}while(nf==face);pickFace(nf)}
+ else if(ty=='boot')boot();
+ return true}
+function vStart(){
+ rec=new SR();rec.lang='pt-BR';rec.continuous=true;rec.interimResults=false;
+ rec.onresult=function(e){for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){var t=e.results[i][0].transcript,ok=handle(t);hd.textContent='Ouvi: "'+t.trim()+'"'+(ok?' ✓':' (sem comando)')}}};
+ rec.onerror=function(e){if(e.error=='not-allowed'||e.error=='service-not-allowed'){vOn=false;tv.className='sw';say('Permissão do reconhecimento de voz negada.')}};
+ rec.onend=function(){if(vOn)setTimeout(function(){try{rec.start()}catch(e){}},300)};
+ rec.start()}
+var tv=document.getElementById('tVoz');
+tv.onclick=function(){
+ if(vOn){vOn=false;try{rec.stop()}catch(e){}tv.className='sw';say('Comandos de voz desligados');hd.textContent='';return}
+ if(!SR){say('Este navegador não tem reconhecimento de voz (use Chrome no Android ou Safari no iOS 14.5+).');return}
+ try{vOn=true;vStart();tv.className='sw on';say('Comandos de voz ligados: diga "oi", "gira", "olho vermelho"... (precisa de internet)')}catch(e){vOn=false;say('Não consegui iniciar o reconhecimento de voz.')}};
+setFace(0,true);
+x.fillStyle='#000';x.fillRect(0,0,480,480);
+loop();
+power(true);
+})();
+</script>
+</body>
+</html>
