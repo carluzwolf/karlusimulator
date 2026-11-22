@@ -87,7 +87,7 @@ class BLECharacteristicCallbacks { public: virtual ~BLECharacteristicCallbacks()
 class BLECharacteristic {
  public:
   static const int PROPERTY_READ=1, PROPERTY_WRITE=2, PROPERTY_NOTIFY=4, PROPERTY_WRITE_NR=8;
-  uint8_t val[64]; size_t len=0; BLECharacteristicCallbacks *cb=nullptr;
+  uint8_t val[64]; size_t len; BLECharacteristicCallbacks *cb;
   void setCallbacks(BLECharacteristicCallbacks *c){ cb=c; }
   void addDescriptor(BLEDescriptor*){}
   void setValue(uint8_t *d, size_t n){ if(n>64)n=64; memcpy(val,d,n); len=n; }
@@ -96,7 +96,7 @@ class BLECharacteristic {
 };
 class BLEService { public: BLECharacteristic *createCharacteristic(const char*, int); void start(){} };
 class BLEAdvertising { public: void addServiceUUID(const char*){} void setScanResponse(bool){} };
-class BLEServer { public: BLEServerCallbacks *cb=nullptr; void setCallbacks(BLEServerCallbacks *c){ cb=c; } BLEService *createService(const char*); };
+class BLEServer { public: BLEServerCallbacks *cb; void setCallbacks(BLEServerCallbacks *c){ cb=c; } BLEService *createService(const char*); };
 class BLEDevice { public: static void init(const char*); static BLEServer *createServer(); static BLEAdvertising *getAdvertising(); static void startAdvertising(){} };
 EOF_SHIM
 for f in BLEServer BLEUtils BLE2902; do printf '#pragma once\n#include <BLEDevice.h>\n' > $f.h; done
