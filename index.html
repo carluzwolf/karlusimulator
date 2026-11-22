@@ -62,8 +62,10 @@ h3{font-size:12px;letter-spacing:1px;color:#999;margin:20px 0 8px;text-transform
  <div class="row"><span>Microfone (reage ao som)</span><button class="sw" id="tMic"></button></div>
  <div class="row"><span>Sensibilidade do microfone</span><input type="range" id="mg" min="5" max="150" value="35" style="width:120px"></div>
  <div class="row"><span>Câmera (gestos)</span><button class="sw" id="tCam"></button></div>
+ <div class="row"><span>Giroscópio (inclinar e balançar)</span><button class="sw" id="tMot"></button></div>
  <div class="row"><span>Comandos de voz (falar com ele)</span><button class="sw" id="tVoz"></button></div>
  <div class="row"><span>Cor dos olhos</span><span><input type="color" id="col" value="#ff42c4" style="width:44px;height:30px;border:0;background:none"> <button class="sw" id="tCol" title="usar a cor"></button></span></div>
+ <div id="dbg" style="font-size:12px;color:#ff1493;padding:2px 0"></div>
  <div id="heard" style="font-size:12px;color:#7fd;padding:2px 0"></div>
  <div id="st" style="font-size:12px;color:#888;padding:6px 0"></div>
  <button class="bt" id="bBlink">Piscar agora</button>
@@ -276,6 +278,29 @@ tv.onclick=function(){
  if(vOn){vOn=false;try{rec.stop()}catch(e){}tv.className='sw';say('Comandos de voz desligados');hd.textContent='';return}
  if(!SR){say('Este navegador não tem reconhecimento de voz (use Chrome ou Edge).');return}
  try{vOn=true;vStart();tv.className='sw on';say('Comandos de voz ligados: diga "oi", "gira", "olho vermelho"... (precisa de internet)')}catch(e){vOn=false;say('Não consegui iniciar o reconhecimento de voz.')}};
+/* ---------- giroscopio / acelerometro ---------- */
+var motOn=false,motT=0,TR=0,angT=0,DZ=0,sgc=null,evc=0,dbgN=0,lastTon=0;
+var IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1);
+function onMot(e){var a=e.accelerationIncludingGravity;if(!a||a.x==null||a.y==null)return;
+ var d=Math.abs(Math.sqrt(a.x*a.x+(a.y*a.y)+(a.z||0)*(a.z||0))-9.81);if(d>8)DZ=Math.min(1,DZ+d/150);
+ evc++;if(sgc===null&&Math.abs(a.y)>4&&Math.abs(a.y)>Math.abs(a.x))sgc=a.y>0?1:-1;
+ var sg=sgc!==null?sgc:(IOS?-1:1),ax=a.x*sg,ay=a.y*sg;
+ if(ax*ax+ay*ay>9)angT=Math.atan2(ax,ay)*57.2958-(window.orientation||0)}
+function motTick(){
+ var df=angT-TR;df=((df+540)%360+360)%360-180;TR+=df*.15;if(TR>180)TR-=360;if(TR<-180)TR+=360;DZ*=.985;
+ cv.style.transform='rotate('+TR.toFixed(1)+'deg)';
+ if(++dbgN%6==0)$('dbg').textContent=evc?('sensor ok · ângulo '+Math.round(TR)+'°'):'sem sinal do sensor ainda...';
+ var n=performance.now();if(DZ>.45&&liveMode&&n-lastTon>4000){lastTon=n;ble([1,118])}}
+function motReq(cb){
+ var D=window.DeviceMotionEvent,O=window.DeviceOrientationEvent;
+ if(D&&D.requestPermission){var p=[D.requestPermission()];if(O&&O.requestPermission)p.push(O.requestPermission());
+  Promise.all(p).then(function(r){cb(r.every(function(v){return v=='granted'}))},function(){cb(false)})}
+ else cb(!!(D||O))}
+var tmo=$('tMot');
+tmo.onclick=function(){
+ if(motOn){motOn=false;window.removeEventListener('devicemotion',onMot);clearInterval(motT);DZ=0;TR=0;angT=0;cv.style.transform='';$('dbg').textContent='';tmo.className='sw';say('Giroscópio desligado');return}
+ motReq(function(ok){if(!ok){say('Sensores negados ou indisponíveis neste aparelho (no computador não há giroscópio; use o celular).');return}
+  motOn=true;sgc=null;evc=0;window.addEventListener('devicemotion',onMot);motT=setInterval(motTick,33);tmo.className='sw on';say('Giroscópio ligado: gire o celular em qualquer sentido (até de cabeça pra baixo) que o rosto continua em pé; balançar forte = tontura.')})};
 startSim();
 })();
 </script>
